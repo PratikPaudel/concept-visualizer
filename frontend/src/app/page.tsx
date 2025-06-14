@@ -11,7 +11,7 @@ export default function MinimalConceptVisualizer() {
 
   const extractHtmlOnly = (raw: string): string => {
     // Remove markdown code blocks if present
-    let cleaned = raw.replace(/```html\n?/gi, "").replace(/```\n?/g, "").trim()
+    const cleaned = raw.replace(/```html\n?/gi, "").replace(/```\n?/g, "").trim()
     
     // Try to find complete HTML document
     let match = cleaned.match(/<!DOCTYPE html>[\s\S]*<\/html>/i)
@@ -124,10 +124,10 @@ Make it comprehensive, engaging, and truly educational. Include multiple interac
             temperature: 0.3,
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 8192,
+            maxOutputTokens: 8192
           }
-        }),
-      })
+        })
+      });
 
       const aiData = await geminiRes.json()
       
