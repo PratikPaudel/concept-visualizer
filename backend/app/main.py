@@ -1,17 +1,34 @@
+import asyncio
+import logging
+from datetime import datetime
+
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.api.routes import router as api_router
 
+# Logger setup
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+# Initialize FastAPI app
 app = FastAPI()
 
 # CORS setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # your frontend origin
+    allow_origins=[
+        "http://localhost:3000",
+        "https://concept-visualizer-six.vercel.app",
+        "https://concept-visualizer-git-main-pratikpaudels-projects.vercel.app",
+        "https://concept-visualizer-nsulwlh9p-pratikpaudels-projects.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Include API routes
 app.include_router(api_router)
