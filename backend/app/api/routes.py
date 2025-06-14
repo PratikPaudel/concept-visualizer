@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 from app.models.concept import ConceptRequest, ConceptResponse
-from app.services.openai_client import generate_concept_visualization
+from app.services.gemini_client import generate_concept_visualization
 
 router = APIRouter()
 

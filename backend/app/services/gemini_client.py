@@ -1,13 +1,62 @@
 import os
 import json
-import openai
+import requests
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Initialize the OpenAI client with your API key
-client = openai.OpenAI(api_key="")
+# Google Gemini API configuration
+GEMINI_API_KEY = ""
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+
+
+def call_gemini_api(messages, temperature=0.5, max_tokens=1024):
+    """Call Google Gemini API with the given messages."""
+    # Convert messages to Gemini format
+    # Combine system and user messages into a single text prompt
+    combined_text = ""
+    for message in messages:
+        if message["role"] == "system":
+            combined_text += f"{message['content']}\n\n"
+        elif message["role"] == "user":
+            combined_text += f"{message['content']}\n\n"
+
+    payload = {
+        "contents": [{"parts": [{"text": combined_text}]}],
+        "generationConfig": {
+            "temperature": temperature,
+            "maxOutputTokens": max_tokens,
+        },
+    }
+
+    headers = {"Content-Type": "application/json"}
+
+    try:
+        response = requests.post(
+            f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
+            headers=headers,
+            json=payload,
+            timeout=30,
+        )
+
+        if response.status_code == 200:
+            response_data = response.json()
+            # Extract text from Gemini response format
+            if "candidates" in response_data and len(response_data["candidates"]) > 0:
+                candidate = response_data["candidates"][0]
+                if "content" in candidate and "parts" in candidate["content"]:
+                    text_response = candidate["content"]["parts"][0]["text"]
+                    print(f"Gemini API Response: {text_response[:200]}...")
+                    return text_response
+            return "Error: Unexpected response format"
+        else:
+            print(f"API Error: {response.status_code} - {response.text}")
+            return f"Error: API call failed with status {response.status_code}: {response.text}"
+    except requests.exceptions.RequestException as e:
+        print(f"Request Exception: {e}")
+        return f"Error: Request failed - {str(e)}"
+
 
 CATEGORY_PROMPTS = {
     # The Computer Science and Math prompts are already in the correct format from our last exchange.
@@ -165,38 +214,45 @@ Concept: "{concept}"
 
 
 async def classify_concept(concept: str) -> str:
-    """Ask GPT to classify the concept into one of the defined categories."""
+    """Ask Gemini to classify the concept into one of the defined categories."""
     categories = list(CATEGORY_PROMPTS.keys())
 
     # Use a system message to set the context and a user message for the specific task
     prompt_messages = [
         {
             "role": "system",
-            "content": "You are an intelligent classifier. Your task is to select the most appropriate category for a given concept from a predefined list.",
+            "content": "You are an intelligent classifier. Your task is to select the most appropriate category for a given concept from a predefined list. Respond with ONLY the exact category name.",
         },
         {
             "role": "user",
-            "content": f"""
-Please classify the concept "{concept}" into one of the following categories.
-Respond with ONLY the exact category name and nothing else.
+            "content": f"""Classify this concept: "{concept}"
 
-Categories:
-{', '.join(categories)}
-""",
+Choose the most appropriate category from these options:
+{chr(10).join(categories)}
+
+Respond with ONLY the exact category name from the list above.""",
         },
     ]
 
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=prompt_messages,
-        temperature=0,
-        max_tokens=50,  # Max tokens can be low as we only expect a category name
+    category = call_gemini_api(prompt_messages, temperature=0, max_tokens=50)
+
+    # Clean up the response and fallback to default if needed
+    category = category.strip()
+
+    # Try to find exact match first
+    for cat in categories:
+        if cat.lower() == category.lower():
+            return cat
+
+    # If no exact match, try partial match
+    for cat in categories:
+        if cat.lower() in category.lower() or category.lower() in cat.lower():
+            return cat
+
+    print(
+        f"Warning: Could not match category '{category}' to any predefined category. Using default."
     )
-
-    category = response.choices[0].message.content.strip()
-
-    # Fallback to a default category if the model's response isn't a valid key
-    return category if category in CATEGORY_PROMPTS else "Education & Learning"
+    return "Education & Learning"
 
 
 async def generate_concept_visualization(concept: str):
@@ -215,30 +271,72 @@ async def generate_concept_visualization(concept: str):
     prompt_messages = [
         {
             "role": "system",
-            "content": "You are a helpful assistant that strictly follows instructions and outputs only valid JSON, without any surrounding text or markdown formatting.",
+            "content": "You are a helpful assistant that outputs structured JSON data for educational visualizations. You must return ONLY valid JSON without any markdown formatting, explanations, or extra text.",
         },
-        {"role": "user", "content": final_prompt},
+        {
+            "role": "user",
+            "content": final_prompt
+            + "\n\nIMPORTANT: Your response must be valid JSON only. Do not include any markdown code blocks, explanations, or other text.",
+        },
     ]
 
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=prompt_messages,
-        temperature=0.5,
-        max_tokens=1024,  # Allow enough tokens for a detailed JSON object
+    visualization_str = call_gemini_api(
+        prompt_messages, temperature=0.3, max_tokens=1024
     )
 
-    visualization_str = response.choices[0].message.content.strip()
-
     print("Step 3: Visualization plan received. Parsing JSON...")
+    print(f"Raw response length: {len(visualization_str)}")
 
-    # Try to parse the string as JSON, with a fallback to return the raw string
+    # Clean the response to extract JSON
+    cleaned_response = visualization_str.strip()
+
+    # Remove any markdown code block formatting if present
+    if cleaned_response.startswith("```"):
+        lines = cleaned_response.split("\n")
+        # Remove first line if it's ```json or ```
+        if lines[0].strip().startswith("```"):
+            lines = lines[1:]
+        # Remove last line if it's ```
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        cleaned_response = "\n".join(lines)
+
+    # Try to find JSON content between curly braces
+    if not cleaned_response.strip().startswith("{"):
+        # Look for JSON object in the response
+        import re
+
+        json_match = re.search(r"\{.*\}", cleaned_response, re.DOTALL)
+        if json_match:
+            cleaned_response = json_match.group(0)
+
+    # Try to parse the string as JSON, with a fallback to return a default structure
     try:
-        visualization_json = json.loads(visualization_str)
-    except json.JSONDecodeError:
-        print("Warning: Failed to parse JSON. Returning raw string.")
+        visualization_json = json.loads(cleaned_response)
+        print("Successfully parsed JSON response")
+    except json.JSONDecodeError as e:
+        print(f"JSON Parse Error: {e}")
+        print(f"Attempted to parse: {cleaned_response[:500]}...")
+
+        # Return a fallback structure that matches the expected format
         visualization_json = {
-            "error": "Failed to parse JSON from model",
-            "raw_response": visualization_str,
+            "title": concept.title(),
+            "layout": f"A visual representation of {concept}",
+            "interaction": f"Interactive elements to explore {concept}",
+            "elements": [
+                {
+                    "label": "Main Component",
+                    "type": "diagram",
+                    "position": "center",
+                    "description": f"Primary visual element explaining {concept}",
+                },
+                {
+                    "label": "Details Panel",
+                    "type": "text",
+                    "position": "side",
+                    "description": "Additional information and explanations",
+                },
+            ],
         }
 
     return {
