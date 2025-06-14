@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize the OpenAI client with your API key
-client = openai.OpenAI(api_key="")
+client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 CATEGORY_PROMPTS = {
     # The Computer Science and Math prompts are already in the correct format from our last exchange.
