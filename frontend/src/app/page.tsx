@@ -133,7 +133,7 @@ export default function MinimalConceptVisualizer() {
                       <div className="w-12 h-12 border-3 border-gray-200 border-t-gray-800 rounded-full animate-spin mx-auto" />
                       <div className="space-y-1">
                         <p className="text-gray-700 font-medium">Creating visualization...</p>
-                        <p className="text-sm text-gray-500">Analyzing "{concept}"</p>
+                        <p className="text-sm text-gray-500">Analyzing &quot;{concept}&quot;</p>
                       </div>
                     </div>
                   </div>
@@ -143,7 +143,7 @@ export default function MinimalConceptVisualizer() {
                       <Brain className="w-12 h-12 text-gray-400 mx-auto" />
                       <div className="space-y-1">
                         <p className="text-gray-700 font-medium">Visualization: {concept}</p>
-                        <p className="text-sm text-gray-500">Interactive content will appear here</p>
+                        <p className="text-sm text-gray-500">{visualizationText || "Interactive content will appear here"}</p>
                       </div>
                     </div>
                   </div>
