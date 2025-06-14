@@ -65,7 +65,7 @@ export default function MinimalConceptVisualizer() {
     setIframeContent("")
 
     try {
-      const res = await fetch("https://concept-visualizer-z8xl.onrender.com:8000/visualize", {
+      const res = await fetch("https://concept-visualizer-z8xl.onrender.com/visualize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ concept }),
