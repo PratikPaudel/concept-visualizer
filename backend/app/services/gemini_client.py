@@ -7,8 +7,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Google Gemini API configuration
-GEMINI_API_KEY = ""
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+
 
 
 def call_gemini_api(messages, temperature=0.5, max_tokens=1024):
